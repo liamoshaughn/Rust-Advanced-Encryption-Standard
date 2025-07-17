@@ -58,6 +58,19 @@ fn gf_mult(a: u8, b: u8) -> u8 {
 }
 
 
+
+
+fn print_state_u8(state: &[[u8; 4]; 4]) {
+    for row in state {
+        for &byte in row {
+            print!("{:02x} ", byte); 
+        }
+        println!();
+    }
+}
+
+//
+
 //Turns a hex string of data into column order state matrix
 fn hex_to_state(hex_str: &str) -> [[u8; 4]; 4] {
     assert_eq!(hex_str.len(), 32, "Hex string must be 32 chars (16 bytes)");
@@ -72,21 +85,4 @@ fn hex_to_state(hex_str: &str) -> [[u8; 4]; 4] {
         }
     }
     state
-}
-
-fn print_state_u8(state: &[[u8; 4]; 4]) {
-    for row in state {
-        for &byte in row {
-            print!("{:02x} ", byte); 
-        }
-        println!();
-    }
-}
-
-// Usage:
-
-fn main() {
-    gf_mult(0xba, 0x77);
-    let state = hex_to_state(hex_str);
-
 }
