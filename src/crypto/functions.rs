@@ -1,3 +1,7 @@
+//This file is for Cryptography functions used in AES
+
+
+
 const S_BOX: [[u8; 16]; 16] = 
 [
     [0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76],
@@ -59,8 +63,8 @@ fn gf_mult(a: u8, b: u8) -> u8 {
 
 
 
-
-fn print_state_u8(state: &[[u8; 4]; 4]) {
+//Probably should be moved to a     dedicated util file
+pub fn print_state_u8(state: &[[u8; 4]; 4]) {
     for row in state {
         for &byte in row {
             print!("{:02x} ", byte); 
@@ -69,52 +73,44 @@ fn print_state_u8(state: &[[u8; 4]; 4]) {
     }
 }
 
-//
-
-//Turns a hex string of data into column order state matrix
-fn hex_to_state(hex_str: String) -> [[u8; 4]; 4] {
-    assert_eq!(hex_str.len(), 32, "Hex string must be 32 chars (16 bytes)");
-    
+/// Converts a 16-byte array into a column-major order state matrix
+pub fn bytes_to_state(bytes: &[u8]) -> [[u8; 4]; 4] {
     let mut state = [[0u8; 4]; 4];
-    for i in 0..4 {
-        for j in 0..4 {
-            let start = 8 * j + 2 * i;
-            let end = start + 2;
-            state[i][j] = u8::from_str_radix(&hex_str[start..end], 16)
-                .expect("Invalid hex character");
+    for col in 0..4 {
+        for row in 0..4 {
+            state[row][col] = bytes[col * 4 + row];
         }
     }
     state
 }
 
 
-fn state_to_hex(state: [[u8; 4]; 4]) -> String {
-    //Converts a 4x4 AES state matrix back to a 32-character hex string.
-    let mut hex_str = String::with_capacity(32);
+pub fn state_to_bytes(state: [[u8; 4]; 4]) -> [u8; 16] {
+    let mut bytes = [0u8; 16];
     for col in 0..4 {
         for row in 0..4 {
-            hex_str.push_str(&format!("{:02x}", state[row][col]));
+            bytes[col * 4 + row] = state[row][col];
         }
     }
-    hex_str
+    bytes
 }
 
 
-fn shift_rows(state: &mut[[u8; 4]; 4]){
+pub fn shift_rows(state: &mut[[u8; 4]; 4]){
     for i in 0..4{
         //shift rows to the left
         state[i].rotate_left(i);
     }
 }
 
-fn inverse_shift_rows(state: &mut [[u8; 4]; 4]){
+pub fn inverse_shift_rows(state: &mut [[u8; 4]; 4]){
     for i in 0..4{
         //shift rows to the left
         state[i].rotate_right(i);
     }
 }
 
-fn mix_columns(state: &mut [[u8; 4]; 4]) {
+pub fn mix_columns(state: &mut [[u8; 4]; 4]) {
     // AES MixColumns constant matrix
     const CONST_MATRIX: [[u8; 4]; 4] = 
     [
@@ -142,7 +138,7 @@ fn mix_columns(state: &mut [[u8; 4]; 4]) {
 }
 
 
-fn inv_mix_columns(state: &mut [[u8; 4]; 4]) {
+pub fn inv_mix_columns(state: &mut [[u8; 4]; 4]) {
     // AES Inverse MixColumns constant matrix
     const INV_CONST_MATRIX: [[u8; 4]; 4] = [
         [0x0e, 0x0b, 0x0d, 0x09],
@@ -168,7 +164,7 @@ fn inv_mix_columns(state: &mut [[u8; 4]; 4]) {
 }
 
 
-fn sub_bytes(state: &mut [[u8; 4]; 4]) {
+pub fn sub_bytes(state: &mut [[u8; 4]; 4]) {
     for row in state.iter_mut() {
         for byte in row.iter_mut() {
             // Split byte into high/low nibbles (4-bit halves)
@@ -181,7 +177,7 @@ fn sub_bytes(state: &mut [[u8; 4]; 4]) {
     }
 }
 
-fn inv_sub_bytes(state: &mut [[u8; 4]; 4]) {
+pub fn inv_sub_bytes(state: &mut [[u8; 4]; 4]) {
     for row in state.iter_mut() {
         for byte in row.iter_mut() {
             // Split byte into high/low nibbles (4-bit halves)
@@ -194,9 +190,9 @@ fn inv_sub_bytes(state: &mut [[u8; 4]; 4]) {
     }
 }
 
-fn add_round_key(key: &str, state: &mut [[u8; 4]; 4]) {
+pub fn add_round_key(key: &Vec<u8>, state: &mut [[u8; 4]; 4]) {
     //xor round key with state_matrix
-    let key_matrix = hex_to_state(key.to_string());
+    let key_matrix = bytes_to_state(&key);
     for (state_row, key_row) in state.iter_mut().zip(key_matrix.iter()) {
         for (state_byte, key_byte) in state_row.iter_mut().zip(key_row.iter()) {
             *state_byte ^= *key_byte; // XOR in-place
@@ -204,50 +200,59 @@ fn add_round_key(key: &str, state: &mut [[u8; 4]; 4]) {
     }
 }
 
-fn expand_key<const ROUNDS: usize>(key: &str) -> Vec<String> {
-    let mut round_keys = vec![String::new(); ROUNDS];
-    let round_constants: [u8; 11] = [0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36];
+pub fn expand_key(key: &[u8], rounds: usize) -> Vec<Vec<u8>> {
+    let key_size = key.len();
     
-    // First round key is the original key
-    round_keys[0] = key.to_string();
+    let mut round_keys = vec![vec![0u8; key_size]; rounds];
+    round_keys[0].copy_from_slice(key);
     
-    for i in 1..ROUNDS {
-        // Convert previous key from hex to bytes
-        let prev_key = hex::decode(&round_keys[i-1]).expect("Invalid hex");
+    let round_constants: [u8; 10] = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36];
+    
+    for i in 1..rounds {
+        let (left, right) = round_keys.split_at_mut(i);
+        let prev_key = &left[i-1];
+        let current_key = &mut right[0];
         
-        // 1. Get last 4 bytes of previous key
         let mut temp = [0u8; 4];
-        temp.copy_from_slice(&prev_key[12..16]);
-        
-        // 2. Rotate left by 1 byte
+        temp.copy_from_slice(&prev_key[key_size-4..]);
+
+        //Rotate last 4 bytes
         temp.rotate_left(1);
         
-        // 3. Substitute each byte using S-box
+        // Apply S-box
         for byte in &mut temp {
-            let high_nibble = (*byte >> 4) as usize;
-            let low_nibble = (*byte & 0x0F) as usize;
-            *byte = S_BOX[high_nibble][low_nibble];
+            *byte = S_BOX[(*byte >> 4) as usize][(*byte & 0x0F) as usize];
         }
         
-        // 4. XOR with round constant
-        temp[0] ^= round_constants[i];
+        // Apply round constant for AES-128/192
+        if key_size != 32 || i % 8 == 4 {
+            temp[0] ^= round_constants[(i-1) % round_constants.len()];
+        }
         
-        // 5. Generate new key
-        let mut new_key = Vec::with_capacity(16);
-        for j in 0..4 {
+        // Generate new key
+        for j in 0..(key_size/4) {
             for k in 0..4 {
-                let val = if j == 0 {
+                let idx = j * 4 + k;
+                current_key[idx] = if j == 0 {
                     prev_key[k] ^ temp[k]
                 } else {
-                    prev_key[j*4 + k] ^ new_key[(j-1)*4 + k]
+                    prev_key[idx] ^ current_key[idx-4]
                 };
-                new_key.push(val);
             }
         }
-        
-        // Store as hex string
-        round_keys[i] = hex::encode(new_key);
     }
     
     round_keys
+}
+
+
+pub fn padding(unpadded: &[u8], block_size: usize) -> Vec<u8>{
+    let padding_length = block_size - (unpadded.len() % block_size);
+    
+    let mut padded = Vec::with_capacity(unpadded.len() + padding_length);
+    padded.extend(unpadded);
+    
+    padded.extend(std::iter::repeat(padding_length as u8).take(padding_length));
+    
+    padded
 }
