@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+block-buffer = "0.10.4"
+block-padding = "0.3.3"
+cipher = "0.4.4"
+getrandom = "0.3.3"
+hex = "0.4.3"
