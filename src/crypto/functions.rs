@@ -103,7 +103,7 @@ pub fn shift_rows(state: &mut[[u8; 4]; 4]){
     }
 }
 
-pub fn inverse_shift_rows(state: &mut [[u8; 4]; 4]){
+pub fn inv_shift_rows(state: &mut [[u8; 4]; 4]){
     for i in 0..4{
         //shift rows to the left
         state[i].rotate_right(i);
@@ -255,4 +255,18 @@ pub fn padding(unpadded: &[u8], block_size: usize) -> Vec<u8>{
     padded.extend(std::iter::repeat(padding_length as u8).take(padding_length));
     
     padded
+}
+
+pub fn unpad(padded: &Vec<u8>) -> Vec<u8> {
+    let pad_length = *padded.last().unwrap() as usize;
+    
+    // Verify padding is valid (all padding bytes match the pad length)
+    let expected_padding = vec![pad_length as u8; pad_length];
+    let actual_padding = &padded[padded.len() - pad_length..];
+    
+    if actual_padding != expected_padding {
+        panic!("Invalid padding, data was most likely tampered with!");
+    }
+    
+    padded[..padded.len() - pad_length].to_vec()
 }
