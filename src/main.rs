@@ -1,5 +1,6 @@
 use clap::Parser;
 use rust_advanced_encryption_standard::crypto::aes;
+use zeroize::Zeroize;
 use std::fs;
 use std::path::Path;
 
@@ -62,12 +63,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
 
-        // Encrypt and save
-        let (ciphertext, key) = aes::ecb::encrypt(&input, key_bytes)?;
+        // Encrypt and save (using Zeroizing for automatic cleanup)
+        let (ciphertext, key) = {
+            let result = aes::ecb::encrypt(&input, key_bytes)?;
+            (result.0, zeroize::Zeroizing::new(result.1))
+        };
+
         fs::write(&args.output, ciphertext)?;
-        fs::write("key.txt", key)?;
+        fs::write("key.txt", &*key)?; // Deref to access inner data
+        
         println!("Encrypted to: {}", args.output);
         println!("Key saved to: key.txt");
+    
     } else {
         // Get key content (file or direct string)
         let key = match args.key {

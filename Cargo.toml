@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+base64 = "0.22.1"
 cipher = "0.4.4"
 clap = { version = "4.5.41", features = ["derive"] }
 getrandom = "0.3.3"
 hex = "0.4.3"
+zeroize = "1.8.1"
