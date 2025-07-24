@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/Rust-1.70%2B-blue)](https://www.rust-lang.org)
 
-A command-line tool for AES-256 encryption/decryption with secure key management, written in Rust.
+A command-line tool for AES-256 encryption/decryption, written in Rust.
 
 ## Features
 
@@ -30,6 +30,7 @@ Options:
   -h, --help             Print help
 ```
 For example to run the encryption on the provided example files:
+
 `cargo run -- -e -f example_files/plaintext/bangarang.txt -o encrypted.txt` 
 
 ## TODO

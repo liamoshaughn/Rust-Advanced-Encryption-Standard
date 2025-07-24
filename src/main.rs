@@ -57,6 +57,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if args.encrypt {
         // Validate key size
+
+        //Support for 128 bit key's at the moment, will break with larger key sizes
         let key_bytes = args.bits / 8;
         if ![16, 24, 32].contains(&key_bytes) {
             eprintln!("Error: Key size must be 128, 192, or 256 bits");
