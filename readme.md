@@ -18,6 +18,7 @@ A command-line tool for AES-256 encryption/decryption with secure key management
 
 `cargo run -- *options*`
 
+```text
 Options:
   -t, --text <TEXT>      Text to encrypt/decrypt
   -f, --file <FILE>      Input file
@@ -27,13 +28,12 @@ Options:
   -e, --encrypt          Encrypt mode
   -d, --decrypt          Decrypt mode
   -h, --help             Print help
-  -V, --version          Print version
-
-for example to run the encryption on the provided example files:
+```
+For example to run the encryption on the provided example files:
 `cargo run -- -e -f example_files/plaintext/bangarang.txt -o encrypted.txt` 
 
 ## TODO
-```rust
+```text
 // Upcoming Features
 - [ ] Add more modes (CBC, GCM, CTR)
 - [ ] Support for 192 & 256 keys
