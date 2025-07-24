@@ -7,7 +7,7 @@ A command-line tool for AES encryption/decryption, written in Rust.
 
 ## Features
 
-- 🔒 **AES-256 Encryption**
+- 🔒 **AES Encryption**
 - 🔑 **Secure Key Generation** using OS random number generator
 - 📁 **File & Text Support**
   - Encrypt/decrypt files or direct text input
