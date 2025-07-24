@@ -84,7 +84,6 @@ pub fn decrypt(ciphertext_hex: String, key_hex: String) -> Result<String, String
         decrypted_data.extend_from_slice(&functions::state_to_bytes(state_matrix));
     }
 
-    functions::unpad(&decrypted_data);
-
+    functions::unpad( &mut decrypted_data);
     String::from_utf8(decrypted_data).map_err(|e| format!("Decryption Failed found Invalid UTF-8: {}", e))
 }

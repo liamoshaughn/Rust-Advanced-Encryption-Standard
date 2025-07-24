@@ -255,16 +255,25 @@ pub fn padding(unpadded: &[u8], block_size: usize) -> Vec<u8>{
     padded
 }
 
-pub fn unpad(padded: &Vec<u8>) -> Vec<u8> {
+/// Removes PKCS#7 padding in-place from a vector
+/// Panics if padding is invalid
+pub fn unpad(padded: &mut Vec<u8>) {
+    if padded.is_empty() {
+        return;
+    }
+
     let pad_length = *padded.last().unwrap() as usize;
     
-    // Verify padding is valid (all padding bytes match the pad length)
-    let expected_padding = vec![pad_length as u8; pad_length];
-    let actual_padding = &padded[padded.len() - pad_length..];
-    
-    if actual_padding != expected_padding {
-        panic!("Invalid padding, data was most likely tampered with!");
+    if pad_length == 0 || pad_length > padded.len() || pad_length > 256 {
+        panic!("Invalid padding length");
+    }
+
+    for &byte in &padded[padded.len() - pad_length..] {
+        if byte != pad_length as u8 {
+            panic!("Invalid padding bytes");
+        }
     }
     
-    padded[..padded.len() - pad_length].to_vec()
+    // Remove padding in-place
+    padded.truncate(padded.len() - pad_length);
 }
