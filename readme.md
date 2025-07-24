@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/Rust-1.70%2B-blue)](https://www.rust-lang.org)
 
-A command-line tool for AES-256 encryption/decryption, written in Rust.
+A command-line tool for AES encryption/decryption, written in Rust.
 
 ## Features
 
