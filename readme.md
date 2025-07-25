@@ -3,6 +3,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/Rust-1.70%2B-blue)](https://www.rust-lang.org)
 
+
+## Security Notice ⚠️
+
+This implementation currently uses **ECB (Electronic Codebook) mode**, which has significant security limitations:
+
+- 🚫 **Not secure for real-world use** - ECB leaks patterns in plaintext data
+- 🔓 **No semantic security** - Identical plaintext blocks produce identical ciphertext
+- 📚 **Educational purposes only** - Demonstrates core AES concepts only
+
+**Do not use** for protecting sensitive data. Future versions may implement secure modes like CBC or GCM with proper authentication. Even still this implementation is unlikely to be audited/verified and should not be used on real-world data.
+
 A command-line tool for AES encryption/decryption, written in Rust.
 
 ## Features
