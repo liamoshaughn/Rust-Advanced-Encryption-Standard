@@ -7,6 +7,7 @@ use std::path::Path;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
+
     /// Text to encrypt/decrypt
     #[arg(short, long, conflicts_with = "file")]
     text: Option<String>,
@@ -20,7 +21,7 @@ struct Cli {
     key: Option<String>,
 
     /// Key size in bits (128/192/256) - encryption only
-    #[arg(short, long, default_value_t = 128, conflicts_with = "key")]
+    #[arg(short, long, default_value_t = 256, conflicts_with = "key")]
     bits: usize,
 
     /// Output file
@@ -56,9 +57,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     if args.encrypt {
-        // Validate key size
 
-        //Support for 128 bit key's at the moment, will break with larger key sizes
+        // Validate key size
         let key_bytes = args.bits / 8;
         if ![16, 24, 32].contains(&key_bytes) {
             eprintln!("Error: Key size must be 128, 192, or 256 bits");
@@ -72,12 +72,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         fs::write(&args.output, ciphertext)?;
-        fs::write("key.txt", &*key)?; // Deref to access inner data
+        fs::write("key.txt", &*key)?;
         
         println!("Encrypted to: {}", args.output);
         println!("Key saved to: key.txt");
     
     } else {
+
         // Get key content (file or direct string)
         let key = match args.key {
             Some(k) => {

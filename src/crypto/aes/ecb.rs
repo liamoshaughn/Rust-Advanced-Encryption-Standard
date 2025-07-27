@@ -2,10 +2,10 @@ use crate::crypto::functions;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use zeroize::{Zeroize, Zeroizing};
 
-const ROUNDS: usize = 11;
 const BLOCK_SIZE: usize = 16;
 
 pub fn encrypt(plaintext: &str, key_size: usize) -> Result<(String, Zeroizing<String>), String> {
+    let rounds = 6 + (key_size / 4);
 
     // Generate random key 
     let mut key_bytes = Zeroizing::new(vec![0u8; key_size]);
@@ -13,7 +13,7 @@ pub fn encrypt(plaintext: &str, key_size: usize) -> Result<(String, Zeroizing<St
         .map_err(|e| format!("Failed to generate key: {}", e))?;
 
     // Expand key
-    let mut round_keys = Zeroizing::new(functions::expand_key(&key_bytes, ROUNDS));
+    let round_keys = Zeroizing::new(functions::expand_key(&key_bytes, rounds));
     let key_hex = Zeroizing::new(hex::encode(&*key_bytes));
 
     // Process plaintext
@@ -29,13 +29,13 @@ pub fn encrypt(plaintext: &str, key_size: usize) -> Result<(String, Zeroizing<St
 
         functions::add_round_key(&round_keys[0], &mut state_matrix);
 
-        for round in 1..ROUNDS {
+        for round in 1..rounds {
 
             functions::sub_bytes(&mut state_matrix);
 
             functions::shift_rows(&mut state_matrix);
             
-            if round != ROUNDS - 1 {
+            if round != rounds - 1 {
                 functions::mix_columns(&mut state_matrix);
             }
             
@@ -50,7 +50,8 @@ pub fn encrypt(plaintext: &str, key_size: usize) -> Result<(String, Zeroizing<St
 
 
 pub fn decrypt(ciphertext_b64: String, key_hex: String) -> Result<String, String> {
-    
+
+    let rounds = 6 + ((key_hex.len() / 2) / 4);
     let key_bytes = hex::decode(key_hex)
         .map_err(|e| format!("Invalid key hex: {}", e))?;
     
@@ -62,7 +63,7 @@ pub fn decrypt(ciphertext_b64: String, key_hex: String) -> Result<String, String
         .map_err(|e| format!("Invalid ciphertext hex: {}", e))?;
 
 
-    let round_keys = functions::expand_key(&key_bytes, ROUNDS);
+    let round_keys = functions::expand_key(&key_bytes, rounds);
 
 
     let mut decrypted_data = Vec::with_capacity(ciphertext.len());
@@ -71,11 +72,11 @@ pub fn decrypt(ciphertext_b64: String, key_hex: String) -> Result<String, String
         let mut state_matrix = functions::bytes_to_state(chunk);
         
 
-        for round in 1..ROUNDS{
+        for round in 1..rounds{
 
-            functions::add_round_key(&round_keys[ROUNDS-round], &mut state_matrix);
+            functions::add_round_key(&round_keys[rounds-round], &mut state_matrix);
 
-            if ROUNDS-round != ROUNDS-1{
+            if rounds-round != rounds-1{
                 functions::inv_mix_columns(&mut state_matrix);
             }
 

@@ -48,4 +48,3 @@ For example to run the encryption on the provided example files:
 ```text
 // Upcoming Features
 - [ ] Add more modes (CBC, GCM, CTR)
-- [ ] Support for 192 & 256 keys

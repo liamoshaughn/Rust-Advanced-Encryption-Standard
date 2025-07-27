@@ -71,7 +71,7 @@ pub fn print_state_u8(state: &[[u8; 4]; 4]) {
     }
 }
 
-/// Converts a 16-byte array into a column-major order state matrix
+// Converts a 16-byte array into a column-major order state matrix
 pub fn bytes_to_state(bytes: &[u8]) -> [[u8; 4]; 4] {
     let mut state = [[0u8; 4]; 4];
     for col in 0..4 {
@@ -96,6 +96,7 @@ pub fn state_to_bytes(state: [[u8; 4]; 4]) -> [u8; 16] {
 
 pub fn shift_rows(state: &mut[[u8; 4]; 4]){
     for i in 0..4{
+
         //shift rows to the left
         state[i].rotate_left(i);
     }
@@ -103,6 +104,7 @@ pub fn shift_rows(state: &mut[[u8; 4]; 4]){
 
 pub fn inv_shift_rows(state: &mut [[u8; 4]; 4]){
     for i in 0..4{
+
         //shift rows to the left
         state[i].rotate_right(i);
     }
@@ -137,6 +139,7 @@ pub fn mix_columns(state: &mut [[u8; 4]; 4]) {
 
 
 pub fn inv_mix_columns(state: &mut [[u8; 4]; 4]) {
+
     // AES Inverse MixColumns constant matrix
     const INV_CONST_MATRIX: [[u8; 4]; 4] = [
         [0x0e, 0x0b, 0x0d, 0x09],
@@ -165,6 +168,7 @@ pub fn inv_mix_columns(state: &mut [[u8; 4]; 4]) {
 pub fn sub_bytes(state: &mut [[u8; 4]; 4]) {
     for row in state.iter_mut() {
         for byte in row.iter_mut() {
+
             // Split byte into high/low nibbles (4-bit halves)
             let high_nibble = (*byte >> 4) as usize;
             let low_nibble = (*byte & 0x0F) as usize;
@@ -178,6 +182,7 @@ pub fn sub_bytes(state: &mut [[u8; 4]; 4]) {
 pub fn inv_sub_bytes(state: &mut [[u8; 4]; 4]) {
     for row in state.iter_mut() {
         for byte in row.iter_mut() {
+
             // Split byte into high/low nibbles (4-bit halves)
             let high_nibble = (*byte >> 4) as usize;
             let low_nibble = (*byte & 0x0F) as usize;
@@ -188,9 +193,10 @@ pub fn inv_sub_bytes(state: &mut [[u8; 4]; 4]) {
     }
 }
 
-pub fn add_round_key(key: &Vec<u8>, state: &mut [[u8; 4]; 4]) {
+pub fn add_round_key(key: &[u8; 16], state: &mut [[u8; 4]; 4]) {
+
     //xor round key with state_matrix
-    let key_matrix = bytes_to_state(&key);
+    let key_matrix = bytes_to_state(key);
     for (state_row, key_row) in state.iter_mut().zip(key_matrix.iter()) {
         for (state_byte, key_byte) in state_row.iter_mut().zip(key_row.iter()) {
             *state_byte ^= *key_byte; // XOR in-place
@@ -198,48 +204,73 @@ pub fn add_round_key(key: &Vec<u8>, state: &mut [[u8; 4]; 4]) {
     }
 }
 
-pub fn expand_key(key: &[u8], rounds: usize) -> Vec<Vec<u8>> {
-    let key_size = key.len();
-    
-    let mut round_keys = vec![vec![0u8; key_size]; rounds];
-    round_keys[0].copy_from_slice(key);
-    
-    let round_constants: [u8; 10] = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36];
-    
-    for i in 1..rounds {
-        let (left, right) = round_keys.split_at_mut(i);
-        let prev_key = &left[i-1];
-        let current_key = &mut right[0];
-        
-        let mut temp = [0u8; 4];
-        temp.copy_from_slice(&prev_key[key_size-4..]);
+pub fn expand_key(key: &[u8], rounds: usize) -> Vec<[u8; 16]> {
+    let key_size = key.len()/4;
 
-        //Rotate last 4 bytes
-        temp.rotate_left(1);
-        
-        // Apply S-box
-        for byte in &mut temp {
-            *byte = S_BOX[(*byte >> 4) as usize][(*byte & 0x0F) as usize];
-        }
-        
-        // Apply round constant for AES-128/192
-        if key_size != 32 || i % 8 == 4 {
-            temp[0] ^= round_constants[(i-1) % round_constants.len()];
-        }
-        
-        // Generate new key
-        for j in 0..(key_size/4) {
-            for k in 0..4 {
-                let idx = j * 4 + k;
-                current_key[idx] = if j == 0 {
-                    prev_key[k] ^ temp[k]
-                } else {
-                    prev_key[idx] ^ current_key[idx-4]
-                };
+    let mut words = Vec::<[u8;4]>::new();
+
+    let round_constants: [u8; 10] = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36];
+    let mut round_count = 0;
+
+    //Add initial key
+    for word in key.chunks_exact(4){
+        words.push(word.try_into().unwrap());
+    }
+
+    //key expansion is here
+    while words.len() < 4 * (rounds + 1) {
+
+        //init new word
+        let mut new_word = words[words.len() - key_size].clone();
+
+        if words.len() % key_size == 0 {
+
+            //When the above triggers it means we are about to create a new key, first word of each key is created by xor'ing the new word created above with the previous word that has had operations done to it as below
+            let mut new_key_word = words[words.len()-1].clone();
+
+            //Rotate Word
+            new_key_word.rotate_left(1);
+
+            //Sub Word
+            for  byte in new_key_word.iter_mut() {
+                let high_nibble = (*byte >> 4) as usize;
+                let low_nibble = (*byte & 0x0F) as usize;
+                
+                *byte = S_BOX[high_nibble][low_nibble];
+            }
+
+            //rcon added
+            new_key_word[0] ^= round_constants[round_count];
+            round_count += 1; 
+
+            //xor with new word
+            for  (byte1, byte2) in new_word.iter_mut().zip(new_key_word.iter()) {
+                *byte1 ^= byte2;
+            }
+
+        } else {
+
+            //xor with previous word
+            for (byte1 , byte2) in new_word.iter_mut().zip(words[words.len()-1].iter()) {
+                *byte1 ^= byte2;
             }
         }
+
+
+
+        words.push(new_word);
     }
-    
+    println!("Total Words: {}", words.len());
+
+    let round_keys = words.chunks(4).filter(|chunk| chunk.len() == 4).map(
+        |chunk| {
+            let mut new = [0; 16];
+            for (i, &arr) in chunk.iter().enumerate() {
+                new[i*4..(i+1)*4].copy_from_slice(&arr);
+            }
+            new
+        }).collect(); 
+
     round_keys
 }
 
