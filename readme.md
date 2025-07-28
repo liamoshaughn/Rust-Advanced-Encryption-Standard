@@ -12,7 +12,7 @@ This implementation currently uses **ECB (Electronic Codebook) mode**, which has
 - 🔓 **No semantic security** - Identical plaintext blocks produce identical ciphertext
 - 📚 **Educational purposes only** - Demonstrates core AES concepts only
 
-**Do not use** for protecting sensitive data. Future versions may implement secure modes like CBC or GCM with proper authentication. Even still this implementation is unlikely to be audited/verified and should not be used on real-world data.
+**Do not use** for protecting sensitive data use another mode like CBC by calling -m cbc. Even still this implementation is unlikely to be audited/verified and should not be used on real-world data.
 
 A command-line tool for AES encryption/decryption, written in Rust.
 
@@ -47,4 +47,5 @@ For example to run the encryption on the provided example files:
 ## TODO
 ```text
 // Upcoming Features
-- [ ] Add more modes (CBC, GCM, CTR)
+- Add more modes (GCM, CTR)
+- Add test vectors from NIST

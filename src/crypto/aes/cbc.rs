@@ -1,3 +1,5 @@
+use std::thread::current;
+
 use crate::crypto::functions;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use zeroize::Zeroizing;
@@ -18,12 +20,25 @@ pub fn encrypt(plaintext: &str, key_size: usize) -> Result<(String, Zeroizing<St
 
     // Process plaintext
     let plaintext_bytes = plaintext.as_bytes();
-    let padded_bytes = functions::padding(plaintext_bytes, BLOCK_SIZE);
+    let mut padded_bytes = functions::padding(plaintext_bytes, BLOCK_SIZE);
 
     let mut encrypted_data = Vec::with_capacity(padded_bytes.len());
 
+    //this will be our iv
+    let mut iv =[0u8; 16];
+    getrandom::fill(&mut iv)
+        .map_err(|e| format!("Failed to IV: {}", e))?;
+
+    let mut previous_chunk = iv.clone();
+
+
+
     // Encrypt in 16-byte blocks
-    for chunk in padded_bytes.chunks_exact(BLOCK_SIZE) {
+    for chunk in padded_bytes.chunks_exact_mut(BLOCK_SIZE) {
+
+        for  (byte1, byte2) in chunk.iter_mut().zip(previous_chunk.iter()) {
+            *byte1 ^= byte2;
+        }
 
         let mut state_matrix = functions::bytes_to_state(chunk);
 
@@ -41,10 +56,10 @@ pub fn encrypt(plaintext: &str, key_size: usize) -> Result<(String, Zeroizing<St
             
             functions::add_round_key(&round_keys[round], &mut state_matrix);
         }
-
-        encrypted_data.extend_from_slice(&functions::state_to_bytes(state_matrix));
+        previous_chunk = functions::state_to_bytes(state_matrix);
+        encrypted_data.extend_from_slice(&previous_chunk);
     }
-
+    encrypted_data.splice(0..0, iv.iter().copied());
     Ok((STANDARD.encode(encrypted_data), key_hex))
 }
 
@@ -59,14 +74,18 @@ pub fn decrypt(ciphertext_b64: String, key_hex: String) -> Result<String, String
         return Err(format!("Invalid key length: {} bytes", key_bytes.len()));
     }
 
-    let ciphertext = STANDARD.decode(ciphertext_b64)
+    let mut ciphertext = STANDARD.decode(ciphertext_b64)
         .map_err(|e| format!("Invalid ciphertext hex: {}", e))?;
+
 
 
     let round_keys = functions::expand_key(&key_bytes, rounds);
 
 
     let mut decrypted_data = Vec::with_capacity(ciphertext.len());
+
+    let mut previous_chunk: [u8; 16] = ciphertext[..16].try_into().expect("Somethings wrong with ciphertext!");
+    ciphertext.drain(0..16);
     
     for chunk in ciphertext.chunks_exact(BLOCK_SIZE){
         let mut state_matrix = functions::bytes_to_state(chunk);
@@ -87,7 +106,17 @@ pub fn decrypt(ciphertext_b64: String, key_hex: String) -> Result<String, String
       
         }
         functions::add_round_key(&round_keys[0], &mut state_matrix);
-        decrypted_data.extend_from_slice(&functions::state_to_bytes(state_matrix));
+
+        let mut current_chunk = functions::state_to_bytes(state_matrix);
+
+        for  (byte1, byte2) in current_chunk.iter_mut().zip(previous_chunk.iter()) {
+
+            *byte1 ^= byte2;
+        }
+
+        previous_chunk = chunk.try_into().expect("Somethings wrong with chunk");
+
+        decrypted_data.extend_from_slice(&current_chunk);
     }
 
     functions::unpad( &mut decrypted_data);

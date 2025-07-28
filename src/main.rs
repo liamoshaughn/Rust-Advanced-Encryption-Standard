@@ -8,33 +8,37 @@ use std::path::Path;
 #[command(author, version, about, long_about = None)]
 struct Cli {
 
-    /// Text to encrypt/decrypt
+    // Text to encrypt/decrypt
     #[arg(short, long, conflicts_with = "file")]
     text: Option<String>,
 
-    /// Input file
+    // Input file
     #[arg(short, long, conflicts_with = "text")]
     file: Option<String>,
 
-    /// Key (text or file path)
+    // Key (text or file path)
     #[arg(short, long)]
     key: Option<String>,
 
-    /// Key size in bits (128/192/256) - encryption only
+    // Key size in bits (128/192/256) - encryption only
     #[arg(short, long, default_value_t = 256, conflicts_with = "key")]
     bits: usize,
 
-    /// Output file
+    // Output file
     #[arg(short, long, default_value = "output.txt")]
     output: String,
 
-    /// Encrypt mode
+    // Encrypt mode
     #[arg(short, long, conflicts_with = "decrypt")]
     encrypt: bool,
 
-    /// Decrypt mode
+    // Decrypt mode
     #[arg(short, long, conflicts_with = "encrypt")]
     decrypt: bool,
+
+    // Mode of encryption
+    #[arg(short, long)]
+    mode: String,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -65,11 +69,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
 
-        // Encrypt and save (using Zeroizing for automatic cleanup)
-        let (ciphertext, key) = {
-            let result = aes::ecb::encrypt(&input, key_bytes)?;
-            (result.0, zeroize::Zeroizing::new(result.1))
+        let encryption_result = match args.mode.to_lowercase().as_str() {
+            "ecb" => {
+                aes::ecb::encrypt(&input, key_bytes)
+                    .map(|(ct, k)| (ct, zeroize::Zeroizing::new(k)))
+            },
+            "cbc" => {
+                aes::cbc::encrypt(&input, key_bytes)
+                    .map(|(ct, k)| (ct, zeroize::Zeroizing::new(k)))
+            },
+            _ => return Err(format!("Unsupported mode: {}. Use 'cbc' or 'ecb'", args.mode).into()),
         };
+
+        let (ciphertext, key) = encryption_result.map_err(|e| format!("Encryption failed: {}", e))?;
 
         fs::write(&args.output, ciphertext)?;
         fs::write("key.txt", &*key)?;
@@ -95,10 +107,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         // Decrypt and save
-        let plaintext = aes::ecb::decrypt(input, key)?;
-        
+        let decryption_result = match args.mode.to_lowercase().as_str() {
+                "ecb" => aes::ecb::decrypt(input, key),
+                "cbc" => {
+                    if input.len() < 16 {
+                        return Err("Input too short for CBC mode (needs IV)".into());
+                    }
+                    aes::cbc::decrypt(input, key)
+                },
+                _ => return Err(format!("Unsupported mode: {}. Use 'cbc' or 'ecb'", args.mode).into()),
+            };
+
+        let plaintext = decryption_result.map_err(|e| format!("Decryption failed: {}", e))?;
+
         fs::write(&args.output, plaintext)?;
         println!("Decrypted to: {}", args.output);
+
     }
 
     Ok(())
