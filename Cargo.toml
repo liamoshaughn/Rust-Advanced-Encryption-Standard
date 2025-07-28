@@ -9,4 +9,5 @@ cipher = "0.4.4"
 clap = { version = "4.5.41", features = ["derive"] }
 getrandom = "0.3.3"
 hex = "0.4.3"
+rayon = "1.10.0"
 zeroize = "1.8.1"

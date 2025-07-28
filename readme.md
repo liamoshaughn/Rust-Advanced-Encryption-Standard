@@ -38,6 +38,7 @@ Options:
   -o, --output <OUTPUT>  Output file [default: output.txt]
   -e, --encrypt          Encrypt mode
   -d, --decrypt          Decrypt mode
+  -m, --mode             ecb, cbc
   -h, --help             Print help
 ```
 For example to run the encryption on the provided example files:

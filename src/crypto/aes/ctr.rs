@@ -1,6 +1,7 @@
 use crate::crypto::functions;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use zeroize::Zeroizing;
+use rayon::prelude::*;
 
 const BLOCK_SIZE: usize = 16;
 
@@ -17,28 +18,23 @@ pub fn encrypt(plaintext: &str, key_size: usize) -> Result<(String, Zeroizing<St
     let key_hex = Zeroizing::new(hex::encode(&*key_bytes));
 
     // Process plaintext
-    let plaintext_bytes = plaintext.as_bytes();
-    let mut padded_bytes = functions::padding(plaintext_bytes, BLOCK_SIZE);
-
-    let mut encrypted_data = Vec::with_capacity(padded_bytes.len());
+    let mut data_bytes = plaintext.as_bytes().to_vec();
 
     //this will be our iv
-    let mut iv =[0u8; 16];
+    let mut iv =[0u8; 12];
     getrandom::fill(&mut iv)
         .map_err(|e| format!("Failed to IV: {}", e))?;
 
-    let mut previous_chunk = iv.clone();
+
+    data_bytes.par_chunks_mut(BLOCK_SIZE).enumerate()
+    .for_each(|(i,chunk)| {
+
+        let mut counter =  [0u8; 16];
+        counter[..12].copy_from_slice(&iv);    
+        counter[12..].copy_from_slice(&(i as u32).to_be_bytes());
 
 
-
-    // Encrypt in 16-byte blocks
-    for chunk in padded_bytes.chunks_exact_mut(BLOCK_SIZE) {
-
-        for  (byte1, byte2) in chunk.iter_mut().zip(previous_chunk.iter()) {
-            *byte1 ^= byte2;
-        }
-
-        let mut state_matrix = functions::bytes_to_state(chunk);
+        let mut state_matrix = functions::bytes_to_state(&counter);
 
         functions::add_round_key(&round_keys[0], &mut state_matrix);
 
@@ -54,11 +50,16 @@ pub fn encrypt(plaintext: &str, key_size: usize) -> Result<(String, Zeroizing<St
             
             functions::add_round_key(&round_keys[round], &mut state_matrix);
         }
-        previous_chunk = functions::state_to_bytes(state_matrix);
-        encrypted_data.extend_from_slice(&previous_chunk);
-    }
-    encrypted_data.splice(0..0, iv.iter().copied());
-    Ok((STANDARD.encode(encrypted_data), key_hex))
+
+
+        for  (byte1, byte2) in chunk.iter_mut().zip(functions::state_to_bytes(state_matrix).iter()) {
+            *byte1 ^= byte2;
+        }
+
+    });
+
+    data_bytes.splice(0..0, iv.iter().copied());
+    Ok((STANDARD.encode(data_bytes), key_hex))
 }
 
 

@@ -1,6 +1,5 @@
 use clap::Parser;
 use rust_advanced_encryption_standard::crypto::aes;
-use zeroize::Zeroize;
 use std::fs;
 use std::path::Path;
 
@@ -36,7 +35,7 @@ struct Cli {
     #[arg(short, long, conflicts_with = "encrypt")]
     decrypt: bool,
 
-    // Mode of encryption
+    // Mode of encryption: cbc, ecb
     #[arg(short, long)]
     mode: String,
 }
