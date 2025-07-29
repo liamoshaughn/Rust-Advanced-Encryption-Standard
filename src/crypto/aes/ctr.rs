@@ -1,6 +1,6 @@
 use crate::crypto::functions;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 use rayon::prelude::*;
 
 const BLOCK_SIZE: usize = 16;
@@ -51,11 +51,13 @@ pub fn encrypt(plaintext: &str, key_size: usize) -> Result<(String, Zeroizing<St
             functions::add_round_key(&round_keys[round], &mut state_matrix);
         }
 
+        counter.zeroize();
 
         for  (byte1, byte2) in chunk.iter_mut().zip(functions::state_to_bytes(state_matrix).iter()) {
             *byte1 ^= byte2;
         }
 
+        state_matrix.zeroize();
     });
 
     data_bytes.splice(0..0, iv.iter().copied());
@@ -64,8 +66,8 @@ pub fn encrypt(plaintext: &str, key_size: usize) -> Result<(String, Zeroizing<St
 
 
 pub fn decrypt(ciphertext_b64: String, key_hex: String) -> Result<String, String> {
-
     let rounds = 6 + ((key_hex.len() / 2) / 4);
+
     let key_bytes = hex::decode(key_hex)
         .map_err(|e| format!("Invalid key hex: {}", e))?;
     
@@ -73,51 +75,50 @@ pub fn decrypt(ciphertext_b64: String, key_hex: String) -> Result<String, String
         return Err(format!("Invalid key length: {} bytes", key_bytes.len()));
     }
 
-    let mut ciphertext = STANDARD.decode(ciphertext_b64)
+    let mut data_bytes = STANDARD.decode(ciphertext_b64)
         .map_err(|e| format!("Invalid ciphertext hex: {}", e))?;
 
 
 
     let round_keys = functions::expand_key(&key_bytes, rounds);
 
+    let mut iv: [u8; 12] = data_bytes[..12].try_into().expect("Somethings wrong with ciphertext!");
+    data_bytes.drain(0..12);
 
-    let mut decrypted_data = Vec::with_capacity(ciphertext.len());
+    //Same operation as encryption because in encryption we XOR plain text with the keystream, XOR again and we reverse
+    data_bytes.par_chunks_mut(BLOCK_SIZE).enumerate().for_each(|(i,chunk)| {
 
-    let mut previous_chunk: [u8; 16] = ciphertext[..16].try_into().expect("Somethings wrong with ciphertext!");
-    ciphertext.drain(0..16);
-    
-    for chunk in ciphertext.chunks_exact(BLOCK_SIZE){
-        let mut state_matrix = functions::bytes_to_state(chunk);
-        
+        let mut counter =  [0u8; 16];
+        counter[..12].copy_from_slice(&iv);    
+        counter[12..].copy_from_slice(&(i as u32).to_be_bytes());
 
-        for round in 1..rounds{
 
-            functions::add_round_key(&round_keys[rounds-round], &mut state_matrix);
+        let mut state_matrix = functions::bytes_to_state(&counter);
 
-            if rounds-round != rounds-1{
-                functions::inv_mix_columns(&mut state_matrix);
-            }
-
-            functions::inv_shift_rows(&mut state_matrix);
-
-            functions::inv_sub_bytes(&mut state_matrix);
-    
-      
-        }
         functions::add_round_key(&round_keys[0], &mut state_matrix);
 
-        let mut current_chunk = functions::state_to_bytes(state_matrix);
+        for round in 1..rounds {
 
-        for  (byte1, byte2) in current_chunk.iter_mut().zip(previous_chunk.iter()) {
+            functions::sub_bytes(&mut state_matrix);
 
+            functions::shift_rows(&mut state_matrix);
+            
+            if round != rounds - 1 {
+                functions::mix_columns(&mut state_matrix);
+            }
+            
+            functions::add_round_key(&round_keys[round], &mut state_matrix);
+        }
+
+        counter.zeroize();
+
+        for  (byte1, byte2) in chunk.iter_mut().zip(functions::state_to_bytes(state_matrix).iter()) {
             *byte1 ^= byte2;
         }
 
-        previous_chunk = chunk.try_into().expect("Somethings wrong with chunk");
+        state_matrix.zeroize();
 
-        decrypted_data.extend_from_slice(&current_chunk);
-    }
+    });
 
-    functions::unpad( &mut decrypted_data);
-    String::from_utf8(decrypted_data).map_err(|e| format!("Decryption failed found Invalid UTF-8: {}", e))
+    String::from_utf8(data_bytes).map_err(|e| format!("Decryption failed found Invalid UTF-8: {}", e))
 }

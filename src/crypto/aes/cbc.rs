@@ -1,6 +1,6 @@
 use crate::crypto::functions;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 const BLOCK_SIZE: usize = 16;
 
@@ -56,6 +56,8 @@ pub fn encrypt(plaintext: &str, key_size: usize) -> Result<(String, Zeroizing<St
         }
         previous_chunk = functions::state_to_bytes(state_matrix);
         encrypted_data.extend_from_slice(&previous_chunk);
+
+        state_matrix.zeroize();
     }
     encrypted_data.splice(0..0, iv.iter().copied());
     Ok((STANDARD.encode(encrypted_data), key_hex))
@@ -115,6 +117,7 @@ pub fn decrypt(ciphertext_b64: String, key_hex: String) -> Result<String, String
         previous_chunk = chunk.try_into().expect("Somethings wrong with chunk");
 
         decrypted_data.extend_from_slice(&current_chunk);
+        state_matrix.zeroize();
     }
 
     functions::unpad( &mut decrypted_data);

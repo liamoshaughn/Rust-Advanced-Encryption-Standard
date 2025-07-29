@@ -35,7 +35,7 @@ struct Cli {
     #[arg(short, long, conflicts_with = "encrypt")]
     decrypt: bool,
 
-    // Mode of encryption: cbc, ecb
+    // Mode of encryption: cbc, ecb, ctr
     #[arg(short, long)]
     mode: String,
 }
@@ -77,7 +77,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 aes::cbc::encrypt(&input, key_bytes)
                     .map(|(ct, k)| (ct, zeroize::Zeroizing::new(k)))
             },
-            _ => return Err(format!("Unsupported mode: {}. Use 'cbc' or 'ecb'", args.mode).into()),
+            "ctr" => {
+                aes::ctr::encrypt(&input, key_bytes)
+                    .map(|(ct, k)| (ct, zeroize::Zeroizing::new(k)))
+            },
+            _ => return Err(format!("Unsupported mode: {}. Use 'cbc', 'ctr' or 'ecb'", args.mode).into()),
         };
 
         let (ciphertext, key) = encryption_result.map_err(|e| format!("Encryption failed: {}", e))?;
@@ -114,7 +118,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     aes::cbc::decrypt(input, key)
                 },
-                _ => return Err(format!("Unsupported mode: {}. Use 'cbc' or 'ecb'", args.mode).into()),
+                "ctr" => {
+                    if input.len() < 16 {
+                        return Err("Input too short for CTR mode (needs IV)".into());
+                    }
+                    aes::ctr::decrypt(input, key)
+                },
+                _ => return Err(format!("Unsupported mode: {}. Use 'cbc', 'ecb' or 'ctr'", args.mode).into()),
             };
 
         let plaintext = decryption_result.map_err(|e| format!("Decryption failed: {}", e))?;
